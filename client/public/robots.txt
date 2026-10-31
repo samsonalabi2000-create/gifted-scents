@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /account
+Disallow: /cart
+Disallow: /checkout
+
+# Replace with your real domain. In production /sitemap.xml is proxied to the API (see README).
+Sitemap: https://YOUR-DOMAIN.example/sitemap.xml

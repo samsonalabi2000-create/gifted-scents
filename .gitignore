@@ -1,0 +1,54 @@
+# dependencies
+node_modules/
+# env + secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+# database dumps
+*.sql.gz
+*.dump
+*.bak
+dumps/
+# builds / tooling
+dist/
+build/
+coverage/
+.vite/
+.DS_Store
+*.log
+npm-debug.log*
+# uploads (dev only)
+server/uploads/
+client/dist/
+server/uploads/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+client/.env
+server/.env
+
+# Local archives and backups
+*.zip
+backups/
+
+# Generated files and local uploads
+client/dist/
+server/uploads/
+
+# All backup files
+*.backup
+*.bak
+*.old
+# Ignore all backup files, including dated and named backup variants
+*backup*
+
+# Ignore previous versions and temporary source copies
+*.before-*
+*.before_*
+*.backup-*

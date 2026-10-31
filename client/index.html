@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-NG">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090706" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Gifted Scents | Authentic Luxury Perfumes in Nigeria</title>
+    <meta name="description" content="Shop designer, premium and Arabic fragrances, body mists, candles and more from Gifted Scents. Delivery across Nigeria." />
+    <meta property="og:site_name" content="Gifted Scents" />
+    <meta property="og:image" content="/og-image.jpg" />
+    <script>
+      // Set the theme before first paint to avoid a flash. Preference: light | dark | system (default).
+      (function () {
+        try {
+          var p = localStorage.getItem('gs-theme') || 'system';
+          var dark = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

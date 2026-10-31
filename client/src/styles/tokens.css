@@ -1,0 +1,80 @@
+/*
+ * Gifted Scents design tokens (Tailwind CSS v4, CSS-first).
+ * Palette is APPROXIMATED from the supplied logo/banner (matte black + metallic gold + neon pink).
+ * Confirm exact hex values with the client's source files and edit ONLY this file to re-brand.
+ */
+@theme {
+  /* brand ramps */
+  --color-ink-950: #090706;
+  --color-ink-900: #120e0c;
+  --color-ink-800: #1c1613;
+  --color-ink-700: #2a211c;
+  --color-gold-200: #f6e3a8;
+  --color-gold-300: #eccb78;
+  --color-gold-400: #dcb256;
+  --color-gold-500: #c9993a;
+  --color-gold-700: #8f6a1f;
+  --color-rose-300: #ff9ccd;
+  --color-rose-400: #ff6fb5;
+  --color-rose-500: #f23d96;
+  --color-rose-600: #d11b7a;
+  --color-ivory-50: #fdfaf5;
+  --color-ivory-100: #f7f1e7;
+
+  /* type */
+  --font-display: 'Cormorant Garamond Variable', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-script: 'Great Vibes', 'Brush Script MT', cursive; /* logo-style accents only, never body text */
+
+  /* radius, shadow, motion, z-index */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --shadow-soft: 0 8px 30px -12px rgb(0 0 0 / 0.35);
+  --shadow-gold: 0 0 0 1px rgb(201 153 58 / 0.35), 0 12px 40px -18px rgb(201 153 58 / 0.45);
+  --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 280ms;
+  --duration-slow: 600ms;
+  --z-sticky: 40;
+  --z-drawer: 60;
+  --z-modal: 70;
+  --z-toast: 90;
+  --z-chat: 50;
+}
+
+/* Semantic tokens: LIGHT is designed on its own (warm ivory), not an inversion of dark. */
+:root {
+  --bg: var(--color-ivory-50);
+  --surface: #ffffff;
+  --surface-2: var(--color-ivory-100);
+  --text: #1a1412;
+  --text-muted: #5f524a;
+  --border: #e6dccd;
+  --accent: var(--color-gold-700);       /* gold text on ivory needs the darker ramp for contrast */
+  --cta: var(--color-rose-600);
+  --cta-text: #ffffff;
+  --ring: var(--color-rose-600);
+}
+
+/* DARK matches the logo: matte black, metallic gold, neon-rose CTAs. */
+.dark {
+  --bg: var(--color-ink-950);
+  --surface: var(--color-ink-900);
+  --surface-2: var(--color-ink-800);
+  --text: #f6efe6;
+  --text-muted: #b9aa9b;
+  --border: #3a2e27;
+  --accent: var(--color-gold-300);
+  --cta: var(--color-rose-500);
+  --cta-text: #12080d;
+  --ring: var(--color-rose-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Extra semantic hooks used by components */
+:root { --ring: var(--color-rose-600); --scrim: rgb(9 7 6 / 0.55); --success: #17803d; --danger: #b42318; --warning: #9a6700; }
+.dark { --ring: var(--color-rose-400); --success: #4ade80; --danger: #fb7185; --warning: #fbbf24; }

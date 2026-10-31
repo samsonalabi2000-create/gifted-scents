@@ -1,0 +1,775 @@
+// Gifted Scents - PostgreSQL schema (Prisma 6)
+// Conventions: UUID ids, money stored as integer KOBO (₦1 = 100 kobo), createdAt/updatedAt everywhere.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  url      = env("DATABASE_URL")
+  provider = "postgresql"
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Role {
+  ADMIN
+  STAFF
+  CUSTOMER
+}
+enum Gender {
+  MEN
+  WOMEN
+  UNISEX
+}
+
+/// Gifted Scents sells more than perfume (see client signboard). Notes/families are optional for non-fragrance types.
+enum ProductType {
+  FRAGRANCE
+  ROLL_ON
+  BODY_MIST
+  OIL_PERFUME
+  CANDLE
+  AIR_FRESHENER
+  POCKET_SCENT
+  DIFFUSER
+  BODY_CREAM
+  SOAP
+  SCRUB
+  GIFT_SET
+  DECANT
+  SAMPLE
+}
+
+enum Concentration {
+  PARFUM
+  EDP
+  EDT
+  EDC
+  COLOGNE
+  OIL
+  BODY_MIST
+  OTHER
+}
+enum Longevity {
+  LOW
+  MODERATE
+  LONG
+  VERY_LONG
+}
+enum Sillage {
+  INTIMATE
+  MODERATE
+  STRONG
+  ENORMOUS
+}
+enum NoteLayer {
+  TOP
+  HEART
+  BASE
+}
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  READY_FOR_DISPATCH
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  ABANDONED
+  REFUNDED
+}
+enum FulfilmentMethod {
+  DELIVERY
+  PICKUP
+}
+enum CouponType {
+  PERCENT
+  FIXED
+}
+enum SupportStatus {
+  NEW
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+enum ChatSender {
+  CUSTOMER
+  AI
+  STAFF
+}
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+  IN_APP
+}
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+/// Only INSPIRED_BY / SIMILAR_PROFILE / ALTERNATIVE are shown as "alternatives"; never imply the designer made the product.
+enum RelationType {
+  INSPIRED_BY
+  SIMILAR_PROFILE
+  ALTERNATIVE
+  SAME_FAMILY
+  COMPLEMENTARY
+}
+
+// ───────────────────────── Users & auth ─────────────────────────
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique
+  phone         String?
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role      @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  lastLoginAt   DateTime?
+  /// saved scent preferences for the Scent Finder (families, notes liked/disliked, budget...)
+  preferences   Json?
+  deletedAt     DateTime?
+  isDemo        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses     CustomerAddress[]
+  refreshTokens RefreshToken[]
+  resetTokens   PasswordResetToken[]
+  carts         Cart[]
+  wishlist      WishlistItem[]
+  orders        Order[]
+  reviews       Review[]
+  tickets       SupportTicket[]
+  conversations SupportConversation[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  family     String    @db.Uuid // rotation family; reuse of a revoked token revokes the family
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([family])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CustomerAddress {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  label        String?
+  recipient    String
+  phone        String
+  state        String
+  lga          String
+  addressLine  String
+  instructions String?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────── Catalog ─────────────────────────
+
+model Brand {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  logoUrl     String?
+  /// Arabic/house brands (Lattafa, Afnan...) vs designer; drives the "Arabic Fragrances" category
+  isArabic    Boolean   @default(false)
+  isFeatured  Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  seoTitle    String?
+  seoDescription String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([isFeatured, sortOrder])
+}
+
+model Category {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  parentId    String?    @db.Uuid
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+
+  @@index([parentId])
+}
+
+model FragranceFamily {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  sortOrder   Int       @default(0)
+  products    Product[]
+}
+
+model FragranceNote {
+  id       String        @id @default(uuid()) @db.Uuid
+  name     String        @unique
+  slug     String        @unique
+  group    String? // citrus, floral, woody, spicy ...
+  iconKey  String?
+  products ProductNote[]
+}
+
+model Product {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String
+  slug             String        @unique
+  type             ProductType   @default(FRAGRANCE)
+  brandId          String        @db.Uuid
+  categoryId       String?       @db.Uuid
+  familyId         String?       @db.Uuid
+  gender           Gender        @default(UNISEX)
+  shortDescription String?
+  description      String?
+  concentration    Concentration?
+  longevity        Longevity?
+  sillage          Sillage?
+  occasions        String[] // e.g. ["office","date night","casual"]
+  videoUrl         String?
+  /// Denormalised from active variants for fast sort/filter. Maintained by the service layer.
+  minPriceKobo     Int           @default(0)
+  hasDiscount      Boolean       @default(false)
+  inStock          Boolean       @default(true)
+  isFeatured       Boolean       @default(false)
+  isBestseller     Boolean       @default(false)
+  isNewArrival     Boolean       @default(false)
+  isActive         Boolean       @default(true)
+  soldCount        Int           @default(0)
+  ratingAvg        Decimal       @default(0) @db.Decimal(3, 2)
+  ratingCount      Int           @default(0)
+  seoTitle         String?
+  seoDescription   String?
+  seoKeywords      String?
+  deletedAt        DateTime?
+  isDemo           Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  brand      Brand            @relation(fields: [brandId], references: [id])
+  category   Category?        @relation(fields: [categoryId], references: [id])
+  family     FragranceFamily? @relation(fields: [familyId], references: [id])
+  variants   ProductVariant[]
+  images     ProductImage[]
+  notes      ProductNote[]
+  reviews    Review[]
+  wishlisted WishlistItem[]
+  relationsFrom ProductRelation[] @relation("RelFrom")
+  relationsTo   ProductRelation[] @relation("RelTo")
+
+  @@index([brandId])
+  @@index([categoryId])
+  @@index([familyId])
+  @@index([isActive, isFeatured])
+  @@index([isActive, isBestseller])
+  @@index([isActive, isNewArrival])
+  @@index([gender, isActive])
+  @@index([minPriceKobo])
+}
+
+model ProductNote {
+  productId String        @db.Uuid
+  noteId    String        @db.Uuid
+  layer     NoteLayer
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  note      FragranceNote @relation(fields: [noteId], references: [id])
+
+  @@id([productId, noteId, layer])
+  @@index([noteId])
+}
+
+/// Sizes are DATA, not code: 50ml, 100ml, Decant, Sample, 30g candle ... all created by the admin.
+model ProductVariant {
+  id             String   @id @default(uuid()) @db.Uuid
+  productId      String   @db.Uuid
+  label          String // "100ml", "Decant 10ml", "Roll-on 10ml"
+  sizeMl         Int?
+  sku            String   @unique
+  priceKobo      Int
+  salePriceKobo  Int?
+  stock          Int      @default(0)
+  lowStockAt     Int? // overrides global threshold
+  imageId        String?  @db.Uuid
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  image     ProductImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  cartItems CartItem[]
+  orderItems OrderItem[]
+  stockMovements StockMovement[]
+
+  @@unique([productId, label])
+  @@index([productId, isActive])
+  @@index([stock])
+}
+
+model ProductImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @db.Uuid
+  url         String // CDN/object-storage URL, never a binary in Postgres
+  storageKey  String // provider key for deletion/transforms
+  alt         String?
+  width       Int?
+  height      Int?
+  sortOrder   Int      @default(0)
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  product  Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variants ProductVariant[]
+
+  @@index([productId, sortOrder])
+}
+
+model ProductRelation {
+  fromId String       @db.Uuid
+  toId   String       @db.Uuid
+  type   RelationType
+  note   String? // optional admin-written explainer
+  from   Product      @relation("RelFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to     Product      @relation("RelTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@id([fromId, toId, type])
+  @@index([toId])
+}
+
+// ───────────────────────── Cart & wishlist ─────────────────────────
+
+model Cart {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String?    @db.Uuid
+  guestId   String?    @unique // anonymous cart token (httpOnly cookie)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        String         @id @default(uuid()) @db.Uuid
+  cartId    String         @db.Uuid
+  variantId String         @db.Uuid
+  quantity  Int
+  createdAt DateTime       @default(now())
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+}
+
+model WishlistItem {
+  userId    String   @db.Uuid
+  productId String   @db.Uuid
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+}
+
+// ───────────────────────── Orders & payments ─────────────────────────
+
+model Coupon {
+  id          String     @id @default(uuid()) @db.Uuid
+  code        String     @unique
+  type        CouponType
+  value       Int // percent (1-100) or kobo
+  minSubtotalKobo Int    @default(0)
+  maxUses     Int?
+  usedCount   Int        @default(0)
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  orders      Order[]
+}
+
+model ShippingZone {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String // "Lagos", "Other Nigerian States", "Pickup"
+  method          FulfilmentMethod @default(DELIVERY)
+  states          String[] // matched against checkout state; empty + isFallback = catch-all
+  isFallback      Boolean  @default(false)
+  feeKobo         Int
+  freeAboveKobo   Int? // free-delivery threshold
+  estimatedDays   String? // "1-2 business days" (admin-written; never hardcoded in UI)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+}
+
+model Order {
+  id              String        @id @default(uuid()) @db.Uuid
+  orderNumber     String        @unique // e.g. GS-240901-0042
+  userId          String?       @db.Uuid // null for guest checkout
+  email           String
+  customerName    String
+  phone           String
+  state           String
+  lga             String
+  addressLine     String
+  instructions    String?
+  zoneId          String?       @db.Uuid
+  couponId        String?       @db.Uuid
+  subtotalKobo    Int
+  shippingKobo    Int
+  discountKobo    Int           @default(0)
+  totalKobo       Int
+  currency        String        @default("NGN")
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  /// stock is only decremented once, when payment is confirmed
+  stockDeducted   Boolean       @default(false)
+  /// set when payment succeeded but stock could not be deducted (race) - staff must act
+  needsAttention  Boolean       @default(false)
+  cartId          String?       @db.Uuid
+  /// lets a guest view their own order without an account
+  publicToken     String?       @unique
+  isDemo          Boolean       @default(false)
+  trackingNote    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user     User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  zone     ShippingZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  coupon   Coupon?      @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+  payments Payment[]
+  history  OrderStatusHistory[]
+  reviews  Review[]
+
+  @@index([userId])
+  @@index([email])
+  @@index([status, createdAt])
+  @@index([paymentStatus])
+}
+
+/// Snapshot of what was bought: later price/name changes must not alter past orders.
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @db.Uuid
+  variantId    String?  @db.Uuid
+  productName  String
+  brandName    String
+  variantLabel String
+  sku          String
+  imageUrl     String?
+  unitPriceKobo Int
+  quantity     Int
+  lineTotalKobo Int
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+model OrderStatusHistory {
+  id         String      @id @default(uuid()) @db.Uuid
+  orderId    String      @db.Uuid
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  note       String?
+  actorId    String?     @db.Uuid
+  createdAt  DateTime    @default(now())
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @db.Uuid
+  gateway     String        @default("paystack")
+  reference   String        @unique
+  amountKobo  Int
+  currency    String        @default("NGN")
+  status      PaymentStatus @default(PENDING)
+  channel     String? // card, bank_transfer, ussd ...
+  gatewayRef  String? // Paystack transaction id
+  paidAt      DateTime?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events      PaymentEvent[]
+
+  @@index([orderId])
+  @@index([status])
+}
+
+/// Webhook idempotency: (gateway, eventKey) is unique, so a replayed event is a no-op.
+model PaymentEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  paymentId  String?  @db.Uuid
+  gateway    String   @default("paystack")
+  eventType  String
+  eventKey   String // e.g. `${event}:${reference}:${gatewayId}`
+  payload    Json
+  processedAt DateTime?
+  createdAt  DateTime @default(now())
+  payment    Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([gateway, eventKey])
+}
+
+// ───────────────────────── Reviews ─────────────────────────
+
+model Review {
+  id               String       @id @default(uuid()) @db.Uuid
+  productId        String       @db.Uuid
+  userId           String?      @db.Uuid
+  orderId          String?      @db.Uuid
+  authorName       String
+  rating           Int // 1-5, enforced in validator + DB check in migration
+  title            String?
+  comment          String
+  verifiedPurchase Boolean      @default(false)
+  status           ReviewStatus @default(PENDING)
+  /// featured on the homepage floating-space testimonials
+  showOnHomepage   Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, userId])
+  @@index([productId, status])
+  @@index([status, showOnHomepage])
+}
+
+// ───────────────────────── Support & AI chat ─────────────────────────
+
+model SupportTicket {
+  id          String        @id @default(uuid()) @db.Uuid
+  ticketNumber String       @unique
+  category    String?
+  userId      String?       @db.Uuid
+  name        String
+  email       String
+  phone       String?
+  orderNumber String?
+  subject     String
+  message     String
+  status      SupportStatus @default(NEW)
+  assignedToId String?      @db.Uuid
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notes SupportNote[]
+  messages SupportMessage[]
+
+  @@index([status, createdAt])
+}
+
+model SupportNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  authorId  String?  @db.Uuid
+  body      String
+  internal  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model SupportConversation {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String?       @db.Uuid
+  sessionId  String // anonymous visitor token
+  status     SupportStatus @default(OPEN)
+  handedOff  Boolean       @default(false) // "Talk to a human" pressed
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages ChatMessage[]
+
+  @@index([sessionId])
+  @@index([status, updatedAt])
+}
+
+model ChatMessage {
+  id             String     @id @default(uuid()) @db.Uuid
+  conversationId String     @db.Uuid
+  sender         ChatSender
+  content        String
+  /// product ids the AI cited (verified against DB before display)
+  productRefs    String[]
+  createdAt      DateTime   @default(now())
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// ───────────────────────── Platform ─────────────────────────
+
+model Notification {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String?             @db.Uuid
+  channel   NotificationChannel
+  template  String // "order.confirmed", "payment.success", ...
+  recipient String
+  payload   Json
+  status    NotificationStatus  @default(QUEUED)
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+}
+
+/// Key/value store for admin-editable settings (store info, WhatsApp, announcement bar, SEO defaults, low-stock threshold...)
+model SiteSetting {
+  key       String   @id
+  value     Json
+  group     String // store | social | support | shipping | website | analytics
+  updatedAt DateTime @updatedAt
+}
+
+model HomepageSection {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique // hero, promo-banner, featured-brands ...
+  title     String?
+  subtitle  String?
+  content   Json?
+  imageUrl  String?
+  ctaLabel  String?
+  ctaHref   String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model SocialLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  platform  String   @unique // instagram | facebook | tiktok | whatsapp | x | youtube
+  url       String
+  handle    String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid
+  action    String // "product.update", "order.status", ...
+  entity    String
+  entityId  String?
+  diff      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+/// Customer-visible conversation on a ticket (replies). SupportNote stays internal-only.
+model SupportMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  sender    ChatSender // CUSTOMER or STAFF
+  authorId  String?  @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+/// Inventory ledger: every stock change is recorded (who, why, resulting balance).
+model StockMovement {
+  id           String   @id @default(uuid()) @db.Uuid
+  variantId    String   @db.Uuid
+  delta        Int
+  balanceAfter Int
+  reason       String // adjustment | order_paid | order_cancelled | restock | initial
+  orderId      String?  @db.Uuid
+  actorId      String?  @db.Uuid
+  note         String?
+  createdAt    DateTime @default(now())
+  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, createdAt])
+}
