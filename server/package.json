@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
@@ -19,7 +21,9 @@
     "db:clear-demo": "node scripts/clear-demo.js",
     "admin:create": "node scripts/create-admin.js"
   },
-  "prisma": { "seed": "node prisma/seed.js" },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "argon2": "^0.41.1",
@@ -43,5 +47,12 @@
   "devDependencies": {
     "pino-pretty": "^11.2.2",
     "prisma": "^6.0.0"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "argon2@0.41.1": true,
+    "prisma@6.19.3": true,
+    "sharp@0.33.5": true
   }
 }
